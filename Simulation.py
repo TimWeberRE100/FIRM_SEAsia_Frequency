@@ -5,14 +5,14 @@
 
 import numpy as np
 
-def Reliability(solution, hydro, start=None, end=None):
+def Reliability(solution, flexible, start=None, end=None):
     """Deficit = Simulation.Reliability(S, hydro=...)"""
 
-    Netload = (solution.MLoad.sum(axis=1) - solution.GPV.sum(axis=1) - solution.GWind.sum(axis=1) - solution.GInter.sum(axis=1))[start:end] \
-              - hydro # Sj-ENLoad(j, t), MW
-    length = len(Netload)
+    Netload = (solution.MLoad.sum(axis=1) - solution.GPV.sum(axis=1) - solution.GWind.sum(axis=1) - solution.GInter.sum(axis=1) - solution.GBaseload.sum(axis=1))[start:end] \
+              - flexible # Sj-ENLoad(j, t), MW
 
-    solution.hydro = hydro # Sj-GHydro(t, j), MW
+    length = len(Netload)
+    solution.flexible = flexible # MW
 
     Pcapacity = sum(solution.CPHP) * pow(10, 3) # S-CPHP(j), GW to MW
     Scapacity = solution.CPHS * pow(10, 3) # S-CPHS(j), GWh to MWh

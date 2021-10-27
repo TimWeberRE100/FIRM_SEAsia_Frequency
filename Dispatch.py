@@ -1,4 +1,4 @@
-# Step-by-step analysis to decide the dispatch of hydropower and other renewables
+# Step-by-step analysis to decide the dispatch of flexible energy resources
 # Copyright (c) 2020 Bin Lu, The Australian National University
 # Licensed under the MIT Licence
 # Correspondence: bin.lu@anu.edu.au
@@ -23,20 +23,18 @@ def Flexible(instance):
     startidx = int((24 / resolution) * (year - firstyear) * 365)
     endidx = int((24 / resolution) * (year+1 - firstyear) * 365)
 
-    HBcapacity = CHydro.sum() * pow(10, 3) # GW to MW
-    hydro = HBcapacity * np.ones(endidx - startidx)
+    Fcapacity = CPeak.sum() * pow(10, 3) # GW to MW
+    flexible = Fcapacity * np.ones(endidx - startidx)
 
     for i in range(0, endidx - startidx, timestep):
-        hydro[i: i+timestep] = baseload.sum()
-        Deficit = Reliability(S, hydro=hydro, start=startidx, end=endidx) # Sj-EDE(t, j), MW
+        flexible[i: i+timestep] = 0
+        Deficit = Reliability(S, flexible=flexible, start=startidx, end=endidx) # Sj-EDE(t, j), MW
         if Deficit.sum() * resolution - S.allowance > 0.1:
-            hydro[i: i+timestep] = HBcapacity
+            flexible[i: i+timestep] = Fcapacity
 
-    hydro = np.clip(hydro - S.Spillage, baseload.sum(), None)
-    contribution = hydro.sum() * resolution * pow(10, -6) # MWh to TWh
-    print('Hydro & other renewables contribution in %s (TWh):' % year, contribution)
+    flexible = np.clip(flexible - S.Spillage, 0, None)
 
-    return hydro
+    return flexible
 
 def Analysis(x):
     """Dispatch.Analysis(result.x)"""
@@ -50,14 +48,14 @@ def Analysis(x):
     Dispresult = pool.map(Flexible, instances)
     pool.terminate()
 
-    Hydro = np.concatenate(Dispresult)
-    np.savetxt('Results/Dispatch_Hydro{}{}.csv'.format(node, percapita), Hydro, fmt='%f', delimiter=',', newline='\n', header='Hydro & other renewables')
+    Flex = np.concatenate(Dispresult)
+    np.savetxt('Results/Dispatch_Flexible{}{}.csv'.format(node, percapita), Flex, fmt='%f', delimiter=',', newline='\n', header='Flexible energy resources')
 
     endtime = dt.datetime.now()
     print('Dispatch took', endtime - starttime)
 
     from Statistics import Information
-    Information(x, Hydro)
+    Information(x, Flex)
 
     return True
 

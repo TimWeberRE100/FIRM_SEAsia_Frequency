@@ -9,17 +9,22 @@ from Optimisation import percapita, node
 Nodel = np.array(['AW', 'AN', 'BN', 'KH', 'CN', 'IN', 'IJ', 'IK', 'IM', 'IP', 'IC', 'IS', 'IT', 'LA', 'MY', 'MM', 'PL', 'PM', 'PV', 'SG', 'TH', 'VH', 'VS'])
 PVl =   np.array(['BN']*1 + ['KH']*1 + ['IJ']*1 + ['IK']*1 + ['IM']*1 + ['IP']*1 + ['IC']*1 + ['IS']*1 + ['IT']*1 + ['LA']*1 + ['MY']*1 + ['MM']*1 + ['PL']*1 + ['PM']*1 + ['PV']*1 + ['SG']*1 + ['TH']*1 + ['VH']*1 + ['VS']*1)
 Windl = np.array(['KH']*1 + ['LA']*1 + ['MM']*1 + ['PL']*1 + ['PM']*1 + ['PV']*1 + ['TH']*1 + ['VH']*1 + ['VS']*1)
-Interl = np.array(['AW']*1 + ['AN']*1 + ['CN']*1 + ['IN']*1)
+Interl = np.array(['AW']*1 + ['AN']*1 + ['CN']*1 + ['IN']*1) if node=='Super2' else np.array([])
 resolution = 1
 
 MLoad = np.genfromtxt('Data/electricity{}.csv'.format(percapita), delimiter=',', skip_header=1) # EOLoad(t, j), MW
-baseload = np.genfromtxt('Data/baseload.csv', delimiter=',', skip_header=1) # EBLoad(0, j), MW
 TSPV = np.genfromtxt('Data/pv.csv', delimiter=',', skip_header=1) # TSPV(t, i), MW
 TSWind = np.genfromtxt('Data/wind.csv', delimiter=',', skip_header=1) # TSWind(t, i), MW
-CHydro = np.genfromtxt('Data/hydro.csv', delimiter=',', skip_header=1) * pow(10, -3) # CHydro(j), MW to GW
+
+assets = np.genfromtxt('Data/assets.csv', dtype=None, delimiter=',', encoding=None)[1:, 3:].astype(np.float)
+CCoal, CGas, COil, CHydro, CGeo, CBio, CWaste = [assets[:, x] * pow(10, -3) for x in range(assets.shape[1])] # CHydro(j), MW to GW
+assets = np.genfromtxt('Data/constraints.csv', dtype=None, delimiter=',', encoding=None)[1:, 3:].astype(np.float)
+ECoal, EGas, EOil, EHydro, EGeo, EBio, EWaste = [assets[:, x] for x in range(assets.shape[1])] # GWh
+CBaseload = (0.5 * EHydro + EGeo + EBio + EWaste) / 8760 # 24/7, GW
+CPeak = CCoal + CGas + COil + CHydro - 0.5 * EHydro / 8760 # GW
 
 inter = 0.05 if node=='Super2' else 0
-CDC0max, CDC1max, CDC7max, CDC8max = 4 * [inter * MLoad.sum() / MLoad.shape[0] / 1000] # 5%: AWIJ + ANIT, CHVH, INMM, MW to GW
+CDC0max, CDC1max, CDC7max, CDC8max = 4 * [inter * MLoad.sum() / MLoad.shape[0] / 1000] # 5%: AWIJ, ANIT, CHVH, INMM, MW to GW
 DCloss = np.array([2100, 1000, 900, 1300, 1300, 500, 200, 600, 1000, 900, 1400, 2100, 900, 600, 1000, 1000, 500, 500, 300, 1300, 700, 600, 400]) * 0.03 * pow(10, -3)
 
 if node in ['BN', 'SG']:
@@ -33,13 +38,13 @@ firstyear, finalyear, timestep = (2010, 2019, 1)
 
 if 'Super' not in node:
     MLoad = MLoad[:, np.where(Nodel==node)[0]]
-    baseload = baseload[np.where(Nodel==node)[0]]
     TSPV = TSPV[:, np.where(PVl==node)[0]]
     TSWind = TSWind[:, np.where(Windl==node)[0]]
-    CHydro = CHydro[np.where(Nodel==node)[0]]
 
-if node!='Super2':
-    Interl = np.array([])
+    CCoal, CGas, COil, CHydro, CGeo, CBio, CWaste = [x[np.where(Nodel == node)[0]] for x in (CCoal, CGas, COil, CHydro, CGeo, CBio, CWaste)]
+    EHydro = EHydro[np.where(Nodel==node)[0]] # GWh
+    CBaseload = CBaseload[np.where(Nodel==node)[0]] # GW
+    CPeak = CPeak[np.where(Nodel==node)[0]] # GW
 
 intervals, nodes = MLoad.shape
 years = int(resolution * intervals / 8760)
@@ -50,10 +55,10 @@ iidx = sidx + 1 + inters
 
 energy = MLoad.sum() * pow(10, -9) * resolution / years # PWh p.a.
 contingency = list(0.25 * MLoad.max(axis=0) * pow(10, -3)) # MW to GW
-CHydro1 = CHydro - baseload * pow(10, -3) # MW to GW
-Hydromax = baseload.sum() * 8760 * 2 # Max contribution from hydro and other renewables, TWh to MWh p.a.
 
-manage = 4 # weeks
+GBaseload = np.tile(CBaseload, (intervals, 1)) * pow(10, 3) # GW to MW
+
+manage = 0 # weeks
 allowance = MLoad.sum(axis=1).max() * 0.05 * manage * 168 * efficiency # MWh
 
 class Solution:
@@ -64,7 +69,6 @@ class Solution:
         self.MLoad = MLoad
         self.intervals, self.nodes = (intervals, nodes)
         self.resolution = resolution
-        self.baseload = baseload
 
         self.CPV = list(x[: pidx]) # CPV(i), GW
         self.CWind = list(x[pidx: widx]) # CWind(i), GW
@@ -81,7 +85,8 @@ class Solution:
         self.Nodel, self.PVl, self.Windl, self.Interl = (Nodel, PVl, Windl, Interl)
         self.node = node
 
-        self.CHydro, self.CHydro1 = (CHydro, CHydro1)
+        self.GBaseload, self.CPeak = (GBaseload, CPeak)
+        self.CHydro, self.EHydro = (CHydro, EHydro) # GW, GWh
 
         self.allowance = allowance
 

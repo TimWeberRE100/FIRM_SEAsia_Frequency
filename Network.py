@@ -19,14 +19,10 @@ def Transmission(solution, output=False):
             MInter[i, :] = solution.GInter[:, np.where(Interl==j)[0]].sum(axis=1)
     MPV, MWind, MInter = (MPV.transpose(), MWind.transpose(), MInter.transpose()) # Sij-GPV(t, i), Sij-GWind(t, i), MW
 
-    baseload = solution.baseload # EBLoad(0, j), MW
-    CHydro1 = solution.CHydro1 # GW
-    hydro = solution.hydro # Sj-GHydro(t, j), MW
-    hydro1 = hydro - baseload.sum() # MW
-
-    hyfactor = np.tile(CHydro1, (intervals, 1)) / CHydro1.sum()
-    MHydro = np.tile(hydro1, (nodes, 1)).transpose() * hyfactor
-    MHydro += np.tile(baseload, (intervals, 1)) # MHydro: GHydro(t, j), MW
+    MBaseload = solution.GBaseload # MW
+    CPeak = solution.CPeak # GW
+    pkfactor = np.tile(CPeak, (intervals, 1)) / CPeak.sum()
+    MPeak = np.tile(solution.flexible, (nodes, 1)).transpose() * pkfactor # MW
 
     MLoad = solution.MLoad # EOLoad(t, j), MW
 
@@ -42,7 +38,7 @@ def Transmission(solution, output=False):
     MDischarge = np.tile(solution.Discharge, (nodes, 1)).transpose() * pcfactor # MDischarge: DPH(j, t)
     MCharge = np.tile(solution.Charge, (nodes, 1)).transpose() * pcfactor # MCharge: CHPH(j, t)
 
-    MImport = MLoad + MCharge + MSpillage - MPV - MWind - MInter - MHydro - MDischarge - MDeficit # EIM(t, j), MW
+    MImport = MLoad + MCharge + MSpillage - MPV - MWind - MInter - MBaseload - MPeak - MDischarge - MDeficit  # EIM(t, j), MW
 
     AWIJ = -1 * MImport[:, np.where(Nodel == 'AW')[0][0]]
     ANIT = -1 * MImport[:, np.where(Nodel == 'AN')[0][0]]
@@ -80,7 +76,7 @@ def Transmission(solution, output=False):
 
     if output:
         MStorage = np.tile(solution.Storage, (nodes, 1)).transpose() * pcfactor # SPH(t, j), MWh
-        solution.MPV, solution.MWind, solution.MInter, solution.MHydro = (MPV, MWind, MInter, MHydro)
+        solution.MPV, solution.MWind, solution.MInter, solution.MBaseload, solution.MPeak = (MPV, MWind, MInter, MBaseload, MPeak)
         solution.MDischarge, solution.MCharge, solution.MStorage = (MDischarge, MCharge, MStorage)
         solution.MDeficit, solution.MSpillage = (MDeficit, MSpillage)
 
