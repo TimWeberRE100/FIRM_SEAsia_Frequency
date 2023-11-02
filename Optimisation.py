@@ -9,12 +9,12 @@ import datetime as dt
 import csv
 
 parser = ArgumentParser()
-parser.add_argument('-i', default=400, type=int, required=False, help='maxiter=4000, 400')
-parser.add_argument('-p', default=2, type=int, required=False, help='popsize=2, 10')
+parser.add_argument('-i', default=1000, type=int, required=False, help='maxiter=4000, 400')
+parser.add_argument('-p', default=10, type=int, required=False, help='popsize=2, 10')
 parser.add_argument('-m', default=0.5, type=float, required=False, help='mutation=0.5')
 parser.add_argument('-r', default=0.3, type=float, required=False, help='recombination=0.3')
-parser.add_argument('-e', default=3, type=int, required=False, help='per-capita electricity: 3, 6 and 9 MWh')
-parser.add_argument('-n', default='Super13', type=str, required=False, help='Super1, Super2, BN, KH, ...')
+parser.add_argument('-e', default=5, type=int, required=False, help='per-capita electricity: 5, 10, 15, 20, 25 MWh')
+parser.add_argument('-n', default='MY', type=str, required=False, help='Super1, Super2, BN, KH, ...')
 args = parser.parse_args()
 
 percapita, node = (args.e, args.n)
