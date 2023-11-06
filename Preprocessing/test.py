@@ -19,10 +19,11 @@ for category in timeseries_names:
 
     plt.subplot(2,2,1)
     plt.plot(time,timeseries_df[category])
-    plt.xlim(0,8760)
+    plt.xlim(3000,5000)
     plt.subplot(2,2,2)
     plt.plot(W,category_storage_frequencies_df[category])
-    plt.xlim(0,1/100)
+    plt.xlim(0,1/23)
+    plt.ylim(0,200000)
     plt.subplot(2,2,3)
     plt.plot(time,timeseries_df[category])
     plt.xlim(0,8760)
