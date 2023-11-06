@@ -12,7 +12,7 @@ def find_maximum_intervals(storage_timeseries_np):
 
     return indices
 
-demand_range = range(5,30,5)
+demand_range = range(5,26)
 sample_spacing = 1 # [1/Hour]
 
 cutoff_frequencies = {
@@ -188,13 +188,13 @@ for demand in demand_range:
     category_storage_timeseries_df["Original"] = storage_timeseries_np
     category_storage_frequencies_df["Frequencies"] = W
 
-    category_storage_frequencies_df.to_csv(f"Results/frequencies_{demand}_top.csv")
-    category_storage_timeseries_df.to_csv(f"Results/energy_profile_{demand}_top.csv")
+    category_storage_frequencies_df.to_csv(f"Results/frequencies_{demand}.csv")
+    category_storage_timeseries_df.to_csv(f"Results/energy_profile_{demand}.csv")
 
     for category in taxonomy:
-        energy_capacity_results.at[demand//5-1,category] = max(np.array(category_storage_timeseries_df[category]))
+        energy_capacity_results.at[demand-5,category] = max(np.array(category_storage_timeseries_df[category]))/1000 # GWh
 
-energy_capacity_results.to_csv("Results/energy_capacity_results_top.csv")
+energy_capacity_results.to_csv("Results/energy_capacity_results.csv")
 
 
     
