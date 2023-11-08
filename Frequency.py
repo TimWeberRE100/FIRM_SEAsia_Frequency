@@ -23,7 +23,7 @@ cutoff_frequencies = {
                     "longterm": [1/(24*30*12),-1/(24*30*12*10)]
                     }
 
-taxonomy = list(cutoff_frequencies.keys())
+taxonomy = ["intraday","overnight","monthly","seasonal","longterm"]
 
 energy_capacity_results = pd.DataFrame()
 energy_capacity_results["Demand [MWh/capita/year]"] = list(demand_range)
@@ -60,9 +60,12 @@ for demand in demand_range:
         minimums[category] = min(category_storage_timeseries_df[category])
 
     # Apportion dc offset across categories based on average value of minimums for a rolling window with period equal to the category
-    #category_energy_capacities = {}
-    for category in taxonomy:
-        if category != "longterm":
+    category_energy_capacities = {}
+    for category_i in range(0,len(taxonomy)):
+        category = taxonomy[category_i]
+        category_energy_capacities[category] = 0
+        if category != "test":
+            #next_category = taxonomy[category_i + 1]
             window_period = int(1/(cutoff_frequencies[category][1])) if category != "longterm" else 87600
             i = 0
             rolling_mins = []
@@ -78,18 +81,21 @@ for demand in demand_range:
             peak_count = 10*365*24
             negative_offset = 0
             #print(rolling_mins_np[rolling_mins_np < -1 * negative_offset])
-            print(max(rolling_mins))
+            #print(max(rolling_mins))
+            print(len(rolling_mins), len(rolling_mins_np[rolling_mins_np < -1 * 2]))
 
             while peak_count >= len(rolling_mins):
                 negative_offset+=1
                 peak_count = len(rolling_mins_np[rolling_mins_np < -1 * negative_offset])
+            
+            negative_offset = -1 * (np.average(rolling_mins_np) - np.std(rolling_mins_np))
 
-            print("Neg offset", negative_offset)                
+            print("Neg offset", negative_offset, np.average(rolling_mins_np), 2*np.std(rolling_mins))                
             category_storage_timeseries_df[category] = numpy_array_cat + negative_offset
             numpy_array_long = category_storage_timeseries_df["longterm"].to_numpy()
             category_storage_timeseries_df["longterm"] = numpy_array_long - negative_offset
 
-            """ j=0
+            j=0
             rolling_maxs = []
             numpy_array_cat = category_storage_timeseries_df[category].to_numpy()
             while j + window_period < len(time):
@@ -100,19 +106,28 @@ for demand in demand_range:
             rolling_maxs_np = np.array(rolling_maxs)
             peak_count = 10*365*24
             positive_cap = 0
-            print("Rolling maxs", min(rolling_maxs_np))
+            #print("Rolling maxs", min(rolling_maxs_np))
 
-            while peak_count >= len(rolling_maxs_np):
+            """ while peak_count >= len(rolling_maxs_np):
                 positive_cap+=1
-                peak_count = len(rolling_maxs_np[rolling_maxs_np > positive_cap])
+                peak_count = len(rolling_maxs_np[rolling_maxs_np > positive_cap]) """
+            
+            positive_cap = np.average(rolling_maxs_np) + np.std(rolling_mins_np)
 
-            category_energy_capacities[category] = positive_cap """
-        else:
-            #category_energy_capacities[category] = 1*pow(10,15)
-            pass
+            #category_energy_capacities[category] = min(positive_cap, max((max(storage_timeseries_np) - sum([category_energy_capacities[x] for x in taxonomy[0:category_i]])), 0))
+            category_energy_capacities[category] = positive_cap
+
+    total_preprocess_capacity = sum([category_energy_capacities[x] for x in taxonomy])
+    total_original_capacity = max(storage_timeseries_np)
+    for category in taxonomy:
+        category_energy_capacities[category] = (category_energy_capacities[category] / total_preprocess_capacity) * total_original_capacity
+    #category_energy_capacities["longterm"] = max(storage_timeseries_np) - sum([category_energy_capacities[x] for x in taxonomy if x != "longterm"])
+    print(category_energy_capacities["monthly"])
+    assert category_energy_capacities["longterm"] >= 0
+            
 
     # Find energy capacity of each category that requires fewest changes to the time series'
-    energy_capacity_total = max(storage_timeseries_np)
+    """ energy_capacity_total = max(storage_timeseries_np)
     maximum_bool_np = (storage_timeseries_np == energy_capacity_total)
     exceeded_count_df = pd.DataFrame()
     maximum_capacity_df = pd.DataFrame()
@@ -133,7 +148,7 @@ for demand in demand_range:
     fewest_changes = min(exceeded_count_df["Total"])
     energy_capacity_interval = exceeded_count_df.index[exceeded_count_df["Total"]==fewest_changes].to_list()[0]
     category_energy_capacities = maximum_capacity_df.iloc[energy_capacity_interval]
-
+    """
     # Adjust the category time series to prevent them exceeding energy capacity
     test=1
     for i in range(0,len(time)):
